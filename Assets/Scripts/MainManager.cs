@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
 
 public class MainManager : MonoBehaviour
 {
@@ -11,17 +12,39 @@ public class MainManager : MonoBehaviour
     public Rigidbody Ball;
 
     public Text ScoreText;
+    public Text BestScoreText;
     public GameObject GameOverText;
+
+    public static MainManager Instance;
     
     private bool m_Started = false;
     private int m_Points;
     
     private bool m_GameOver = false;
 
-    
+    public Dictionary<string, int> playerScores = new Dictionary<string, int>(); 
+
+    private void Awake() {
+        
+        if (Instance != null){
+
+            Destroy(gameObject);
+            return;
+
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+        Instance.LoadTopScore();
+        Debug.Log(Instance.playerScores.ContainsKey(InputManager.InputInstance.input));
+
+        
+
+    }
     // Start is called before the first frame update
     void Start()
-    {
+    {   
+        
         const float step = 0.6f;
         int perLine = Mathf.FloorToInt(4.0f / step);
         
@@ -36,6 +59,16 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+        
+        if (!Instance.playerScores.ContainsKey(InputManager.InputInstance.input)){
+
+            Instance.playerScores.Add(InputManager.InputInstance.input, 0);
+            // Debug.Log(playerScores[InputManager.InputInstance.input]);
+
+        }
+        
+
+        
     }
 
     private void Update()
@@ -60,6 +93,8 @@ public class MainManager : MonoBehaviour
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
+
+        UpdateBestScoreText();
     }
 
     void AddPoint(int point)
@@ -71,6 +106,60 @@ public class MainManager : MonoBehaviour
     public void GameOver()
     {
         m_GameOver = true;
+        if (m_Points > Instance.playerScores[InputManager.InputInstance.input]){
+
+            Instance.playerScores.Remove(InputManager.InputInstance.input);
+            Instance.playerScores.Add(InputManager.InputInstance.input, m_Points);
+
+        }
+        
+        Debug.Log(playerScores[InputManager.InputInstance.input]);
+
         GameOverText.SetActive(true);
     }
+
+    void UpdateBestScoreText(){
+
+        BestScoreText.text = "Best Score: " + Instance.playerScores[InputManager.InputInstance.input] + " Name: " + InputManager.InputInstance.input;
+
+    }
+
+    private void OnApplicationQuit() {
+        
+        SaveTopScore();
+
+    }
+
+
+    [System.Serializable]
+    class SaveData
+    {
+        public Dictionary<string, int> playerScores;
+    }
+
+    public void SaveTopScore(){
+
+        SaveData data = new SaveData();
+        data.playerScores = Instance.playerScores;
+
+        string json = JsonUtility.ToJson(data);
+  
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
+
+    }
+
+    public void LoadTopScore()
+    {
+    string path = Application.persistentDataPath + "/savefile.json";
+    if (File.Exists(path))
+    {
+        string json = File.ReadAllText(path);
+        SaveData data = JsonUtility.FromJson<SaveData>(json);
+        
+        Instance.playerScores = data.playerScores;
+    }
+
+    
+}
+
 }
